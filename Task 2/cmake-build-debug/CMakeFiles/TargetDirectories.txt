@@ -1,0 +1,3 @@
+D:/Projects/CLionProjects/Discrete Maths/cmake-build-debug/CMakeFiles/Discrete_Maths.dir
+D:/Projects/CLionProjects/Discrete Maths/cmake-build-debug/CMakeFiles/edit_cache.dir
+D:/Projects/CLionProjects/Discrete Maths/cmake-build-debug/CMakeFiles/rebuild_cache.dir
