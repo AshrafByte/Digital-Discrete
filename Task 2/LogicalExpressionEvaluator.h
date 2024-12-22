@@ -13,13 +13,20 @@ using namespace std;
 
 class LogicalExpressionEvaluator
 {
+public:
+    // Constructor to initialize inputs map
+    explicit LogicalExpressionEvaluator(const map<char, bool> &inputs);
+
+    // Public method to evaluate the logical expression
+    bool evaluateExpression(const string &expression);
+
 private:
-    std::map<char, bool> inputs; // Member data field to store inputs
+    map<char, bool> inputs; // Member data field to store inputs
     // Check if the symbol is a logical operator
     static bool isLogicalOperator(char symbol);
 
     // Check if the symbol is a valid input variable
-    bool isInput(char symbol);
+    bool isInputVariable(char symbol);
 
     // Pop the top element from a stack and return it
     template<typename T>
@@ -33,12 +40,8 @@ private:
 
     static bool isTopPrecedenceHigher(stack<char> &operators, char op);
 
-public:
-    // Constructor to initialize inputs map
-    explicit LogicalExpressionEvaluator(const map<char, bool> &inputs);
+    void validateExpression(const string &expression);
 
-    // Public method to evaluate the logical expression
-    bool evaluateExpression(const string &expression);
 };
 
 // Constructor
@@ -46,6 +49,7 @@ inline LogicalExpressionEvaluator::LogicalExpressionEvaluator(const map<char, bo
 
 inline bool LogicalExpressionEvaluator::evaluateExpression(const string &expression)
 {
+    validateExpression(expression);
     stack<bool> operands; // Stack to store operands (values)
     stack<char> operations; // Stack to store operators and parentheses
 
@@ -76,7 +80,7 @@ inline void LogicalExpressionEvaluator::processSymbol(char symbol, stack<char> &
         operations.push(symbol);
     }
     // Push the value of the input symbol to operands stack
-    else if (isInput(symbol))
+    else if (isInputVariable(symbol))
         operands.push(inputs.at(symbol));
 
     else if (symbol == ')')
@@ -87,7 +91,8 @@ inline void LogicalExpressionEvaluator::processSymbol(char symbol, stack<char> &
 
         if (!operations.empty())
             operations.pop(); // Remove '(' from the stack
-    }
+    } else
+        throw runtime_error("Error: Unsupported Operator '" + string(1, symbol) + "' found in the expression.\n");
 }
 
 inline void LogicalExpressionEvaluator::evaluate(stack<char> &operations, stack<bool> &operands)
@@ -131,7 +136,7 @@ inline bool LogicalExpressionEvaluator::isLogicalOperator(char symbol)
     return symbol == '&' || symbol == '|' || symbol == '~';
 }
 
-inline bool LogicalExpressionEvaluator::isInput(char symbol)
+inline bool LogicalExpressionEvaluator::isInputVariable(char symbol)
 {
     return inputs.find(symbol) != inputs.end();
 }
@@ -151,6 +156,26 @@ inline bool LogicalExpressionEvaluator::isTopPrecedenceHigher(stack<char> &opera
 
     unordered_map<char, int> precedence = {{'~', 3}, {'&', 2}, {'|', 1}};
     return precedence[operators.top()] > precedence[op];
+}
+
+inline void LogicalExpressionEvaluator:: validateExpression(const string &expression)
+{
+    int balance = 0;
+    for (size_t i = 0; i < expression.size(); ++i)
+    {
+        char c = expression[i];
+        if (c == '(')
+            ++balance;
+        else if (c == ')')
+        {
+            --balance;
+            if (balance < 0)
+                throw runtime_error("Error: Unmatched closing parenthesis ')' at position " + to_string(i) + ".");
+        }
+    }
+
+    if (balance > 0)
+        throw runtime_error("Error: Unmatched opening parenthesis '(' in the expression.");
 }
 
 

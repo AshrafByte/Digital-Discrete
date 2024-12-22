@@ -11,112 +11,87 @@
 #include <vector>
 
 #include "LogicalExpressionEvaluator.h"
-#define GREEN   "\033[32m"
-#define RED     "\033[31m"
+
 #define RESET   "\033[0m"
+#define RED     "\033[31m"
+#define GREEN   "\033[32m"
+#define BLUE    "\033[34m"
+
 using namespace std;
 
 class TruthTable
 {
-private:
-    map<char, bool> inputs; // Map of input variables
-    vector<string> expressions; // List of logical expressions
-    vector<string> headers; // Stores input variables and expressions as headers
-    vector<vector<bool> > table; // 2D vector to store the truth table values
-
-    int width; // Width for table formatting
-    const double padding = 1.5;
-
-    bool areEquivalent;
-
-    int orignalExpIndex;
-    int simplifiedExpIndex;
-
-    bool orignalSatisfiable;
-    bool simplifiedSatisfiable;
-
-    map<string, bool> satisfiableInputsForOrginal;
-    map<string, bool> satisfiableInputsForSimplified;
-
-
-    // Helper method to calculate the maximum width for formatting
-    int getMaxWidth();
-
-    // Generate the truth table data
-    void generate();
-
-    // helper method to get inputs that make an expression satisfiable.
-    map<string, bool> getSatisfiableInputs(int expressionIndex);
-
 public:
-    TruthTable(const map<char, bool> &inputs, const vector<string> &expressions);
+    // Constructor that initializes the truth table with input variables and logical expressions
+    TruthTable(const map<char, bool> &inputs, const map<string, string> &expressions);
 
-    // Print the truth table
+    // Prints the generated truth table
     void print();
 
-    bool hasEquivalentExpressions() const { return areEquivalent; }
+    // Regenerates the truth table with new inputs and expressions
+    void regenerate(const map<char, bool> &inputs, const map<string, string> &expressions);
 
-    map<string, bool> getSatisfiableInputsForOrginal() { return satisfiableInputsForOrginal; }
-    map<std::string, bool> getSatisfiableInputsForSimplified() { return satisfiableInputsForSimplified; }
+    [[nodiscard]] const vector<vector<bool>>& getTableValues() const { return table; }
 
-    string getOrginalExpression() { return headers[orignalExpIndex]; }
-    string getSimplifiedExpression() { return headers[simplifiedExpIndex]; }
+private:
+    map<char, bool> inputs; // Map of input variables (e.g., 'A', 'B', 'C')
+    map<string, string> expressions; // Map of logical expressions with names as keys
+    vector<string> headers; // Stores input variables and expressions as headers
+    vector<vector<bool>> table; // 2D vector to store the truth table values
+    const double padding = 1.5; // Padding for output formatting
 
-    bool isOrignalExpSatisfiable() const { return orignalSatisfiable; }
-    bool isSimplifiedExpSatisfiable() const { return simplifiedSatisfiable; }
+    // Returns the maximum width for formatting the columns in the table
+    size_t getMaxWidth() const;
 
-    void regenrate(const map<char, bool> &inputs, const vector<string> &expressions);
+    // Generates the truth table by evaluating all possible input combinations for each expression
+    void generate();
+
+    // Initializes the truth table with the provided inputs and expressions
+    void initialize(const map<char, bool>& inputs, const map<string, string> &expressions);
 };
 
 // Constructor implementation
-inline TruthTable::TruthTable(const map<char, bool> &inputs, const vector<string> &expressions)
-    : inputs(inputs), expressions(expressions), width(getMaxWidth()), areEquivalent(true)
+inline TruthTable::TruthTable(const map<char, bool> &inputs, const map<string, string> &expressions)
 {
-    generate();
-    orignalExpIndex = headers.size() - 2;
-    simplifiedExpIndex = headers.size() - 1;
-
-    satisfiableInputsForOrginal = getSatisfiableInputs(orignalExpIndex);
-    satisfiableInputsForSimplified = getSatisfiableInputs(simplifiedExpIndex);
-
-    orignalSatisfiable = !satisfiableInputsForOrginal.empty();
-    simplifiedSatisfiable = !satisfiableInputsForSimplified.empty();
+    initialize(inputs, expressions);
 }
 
-
-inline int TruthTable::getMaxWidth()
+// Calculate the maximum width for formatting, based on the longest input and expression names
+inline size_t TruthTable::getMaxWidth() const
 {
-    int max_width = 0;
+    size_t max_width = 0;
 
-    // Find the maximum width among variable names and expressions
-    for (const auto &entry: inputs)
-        max_width = max(max_width, (int) to_string(entry.first).length());
+    // Find the maximum width among input variables and expression names
+    for (const auto& entry : inputs)
+        max_width = max(max_width, size_t(1));  // Input variables are always 1 character
 
-    for (const string &expression: expressions)
-        max_width = max(max_width, (int) expression.length());
+    for (const auto& entry : expressions)
+        max_width = max(max_width, entry.first.length());  // Expression names
 
-    return max_width; // Add padding for better readability
+    return max_width; // Return the maximum width found
 }
 
+// Generate the truth table by evaluating all possible combinations of input values
 inline void TruthTable::generate()
 {
-    int numInputs = inputs.size();
+    auto numInputs = inputs.size();
     table.clear(); // Clear any existing data
     headers.clear(); // Reset headers
 
     // Populate headers with input variables and expressions
-    for (const auto &entry: inputs)
+    for (const auto& entry : inputs)
         headers.emplace_back(1, entry.first);
 
-    headers.insert(headers.end(), expressions.begin(), expressions.end());
+    for (const auto& entry : expressions)
+        headers.push_back(entry.first);  // Add the expression name (label) to headers
 
-    // Iterate over all possible input combinations
+    // Iterate over all possible input combinations (2^numInputs)
     for (int i = 0; i < (1 << numInputs); i++)
     {
         vector<bool> row;
         auto it = inputs.begin();
 
-        // Assign binary values to inputs
+        // Assign binary values to inputs for the current combination
         for (int j = 0; j < numInputs; j++, ++it)
         {
             bool current_bit = (i >> (numInputs - j - 1)) & 1;
@@ -126,69 +101,51 @@ inline void TruthTable::generate()
 
         // Evaluate each expression for the current input combination
         LogicalExpressionEvaluator evaluator(inputs);
-        for (const string &expression: expressions)
-            row.push_back(evaluator.evaluateExpression(expression));
+        for (const auto& expression : expressions)
+            row.push_back(evaluator.evaluateExpression(expression.second)); // Evaluate the expression
 
-        areEquivalent &= !(row[row.size() - 1] ^ row[row.size() - 2]);
         table.push_back(row); // Add the row to the table
     }
 }
 
+// Print the truth table
 inline void TruthTable::print()
 {
+    size_t width = getMaxWidth(); // Get the maximum width for formatting
+
     // Print headers
-    for (const string &header: headers)
-        cout << left << setw(width * padding) << header;
+    for (const string& header : headers)
+        cout << left << setw(width * padding) << header;  // Print each header with padding
     cout << endl;
 
-    // Print rows
-    for (const vector<bool> &row: table)
+    // Print rows (truth values for each input and expression)
+    for (const vector<bool>& row : table)
     {
-        for (bool value: row)
+        for (bool value : row)
         {
+            // Print values with color coding (blue for true, red for false)
             if (value)
-                cout << "\033[34m" << left << setw(width * padding) << value << "\033[0m"; // Blue for 1
+                cout << BLUE << left << setw(width * padding) << value << RESET;  // Blue for 1
             else
-                cout << "\033[31m" << left << setw(width * padding) << value << "\033[0m"; // Red for 0
+                cout << RED << left << setw(width * padding) << value << RESET;  // Red for 0
         }
-        cout << endl;
+        cout << endl;  // New line after each row
     }
-    cout << endl;
+    cout << endl;  // New line after the table
 }
 
-inline map<string, bool> TruthTable::getSatisfiableInputs(int expressionIndex)
+// Regenerate the truth table with new inputs and expressions
+inline void TruthTable::regenerate(const map<char, bool> &inputs, const map<string, string> &expressions)
 {
-    map<string, bool> satisfiableInputs;
-    for (auto &row: table)
-    {
-        bool expValue = row[expressionIndex];
-        if (expValue)
-        {
-            for (int i = 0; i < inputs.size(); i++)
-                satisfiableInputs.insert({headers[i], row[i]});
-            break;
-        }
-    }
-    return satisfiableInputs;
+    initialize(inputs, expressions);
 }
 
-inline void TruthTable::regenrate(const map<char, bool> &inputs, const vector<string> &expressions)
+// Initialize the truth table by setting inputs, expressions, and generating the table
+inline void TruthTable::initialize(const map<char, bool>& inputs, const map<string, string> &expressions)
 {
     this->inputs = inputs;
     this->expressions = expressions;
-    this->width = getMaxWidth();
-    this->areEquivalent = true;
-
-    generate();
-    orignalExpIndex = headers.size() - 2;
-    simplifiedExpIndex = headers.size() - 1;
-
-    satisfiableInputsForOrginal = getSatisfiableInputs(orignalExpIndex);
-    satisfiableInputsForSimplified = getSatisfiableInputs(simplifiedExpIndex);
-
-    orignalSatisfiable = !getSatisfiableInputsForOrginal().empty();
-    simplifiedSatisfiable = !getSatisfiableInputsForSimplified().empty();
+    generate(); // Generate the truth table
 }
-
 
 #endif //TRUTHTABLE_H

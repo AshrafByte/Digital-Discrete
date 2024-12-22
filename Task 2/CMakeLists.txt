@@ -5,4 +5,5 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_executable(Discrete_Maths main.cpp
         LogicalExpressionEvaluator.h
-        TruthTable.h)
+        TruthTable.h
+        DiscreteLogic.h)

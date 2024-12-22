@@ -4,6 +4,8 @@
 #include <string>
 #include <iomanip>
 #include <vector>
+
+#include "DiscreteLogic.h"
 #include "TruthTable.h"
 using namespace std;
 #define GREEN   "\033[32m"
@@ -11,60 +13,69 @@ using namespace std;
 #define RESET   "\033[0m"
 
 
-map<char, bool> readInputs(const string & message);
+map<char, bool> extractAndValidateVariables(const string & originalExp , const string & simplifiedExp);
 string readExpression(string const &message);
-void printExpression(const string &s);
-void printInputs(const map<string, bool> &inputs);
-pair<string, string> changeExpression(string expression);
-void evaluateExpressionEquivalence(TruthTable &table);
-void evaluateExpressionSatisfiability(TruthTable &table, const string &expression, const string &label, bool isOriginal);
-void adjustExpressionForSatisfiability(TruthTable &table, map<char, bool> &inputs, string &expression, const string &otherExpression, bool isOriginal);
-
+void displayWelcomeAndInstructions();
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int main()
 {
+    displayWelcomeAndInstructions();
     // Read inputs and expressions
-    map<char, bool> inputs = readInputs("Enter the number of input variables: ");
-    string orginalExp = readExpression("Enter the original expression: ");
+    string originalExp = readExpression("Enter the original expression: ");
     string simplifiedExp = readExpression("Enter the simplified expression: ");
-    vector<string> expressions = {orginalExp, simplifiedExp};
-    cout << endl;
+    cout << endl ;
+    // Extract input variables from the original expression and validate that the simplified expression uses the same variables.
+    map <char,bool> inputs = extractAndValidateVariables(originalExp,simplifiedExp);
+    map <string,string> expressions = {{"Original",originalExp}, {"Simplified",simplifiedExp}};
+    cout << endl ;
 
-    // Create TruthTable instance and generate table
-    TruthTable table(inputs, expressions);
-    table.print();
-
-    evaluateExpressionEquivalence(table);
-
-    evaluateExpressionSatisfiability(table, orginalExp, "Original expression", true);
-    evaluateExpressionSatisfiability(table, simplifiedExp, "Simplified expression", false);
-
-    adjustExpressionForSatisfiability(table, inputs, orginalExp, simplifiedExp, true);
-    adjustExpressionForSatisfiability(table, inputs, simplifiedExp, orginalExp, false);
-
+    DiscreteLogic circuit(originalExp,simplifiedExp);
+    circuit.displayTruthTable();
+    circuit.evaluateExpressionEquivalence();
+    circuit.evaluateExpressionSatisfiability(ExpressionType::Original);
+    circuit.evaluateExpressionSatisfiability(ExpressionType::Simplified);
+    circuit.adjustExpressionForSatisfiability(ExpressionType::Original);
+    circuit.adjustExpressionForSatisfiability(ExpressionType::Simplified);
+    circuit.repeat();
+    
     return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Method definitions
-map<char, bool> readInputs(const string &message)
+map<char, bool> extractAndValidateVariables(const string & originalExp , const string & simplifiedExp)
 {
-    cout << message;
-    int input_size;
-    cin >> input_size;
+    map<char, bool> inputVariables;
 
-    map<char, bool> inputs;
-    for (int i = 0; i < input_size; i++)
+    for (const auto & symbol : originalExp)
     {
-        cout << "Enter symbol for input variable " << i + 1 << ": ";
-        char symbol;
-        cin >> symbol;
-        inputs.insert({symbol, false});
+        if (isalpha(symbol))
+            inputVariables.emplace(symbol,false);
     }
 
-    cin.ignore(); // To clear the newline left by previous input
-    return inputs;
+    for (const auto &symbol : simplifiedExp)
+    {
+        if (isalpha(symbol) && inputVariables.find(symbol) == inputVariables.end())
+        {
+            auto getInputSymbolsList = [&inputVariables]() -> string
+            {
+                string symbolsList;
+                for (const auto &entry : inputVariables)
+                    symbolsList += entry.first + string(", ");
+                if (!symbolsList.empty())
+                    symbolsList.pop_back(), symbolsList.pop_back(); // Remove the trailing ", "
+                return symbolsList;
+            };
+
+            throw runtime_error(
+                "\nError: Unexpected input symbol '" + string(1, symbol) + "' found in the simplified expression.\n" +
+                "The simplified expression must use the same input symbols (variables) as the original expression.\n" +
+                "Original expression input symbols: [" +
+                getInputSymbolsList() + "].");
+        }
+    }
+    return inputVariables;
 }
 
 string readExpression(string const &message)
@@ -75,90 +86,29 @@ string readExpression(string const &message)
     return expression;
 }
 
-pair<string, string> changeExpression(string expression)
-{
-    bool logicExist = false;
-    for (auto &symbol: expression)
-    {
-        if (symbol == '|' || symbol == '&')
-        {
-            logicExist = true;
-            break;
-        }
-    }
-
-    if (!logicExist)
-        return {"Error", expression};
-
-    int index = rand() % (expression.size());
-    while (expression[index] != '&' && expression[index] != '|')
-        index = rand() % (expression.size());
-
-    char symbol = expression[index];
-    string log;
-    string newExpression = expression;
-
-    if (expression[index] == '|')
-    {
-        newExpression[index] = '&';
-        log = "changing one OR gate to AND gate, old expression is [ " + expression + " ] new expression is [ " +
-              newExpression + " ]\n";;
-    } else if (expression[index] == '&')
-    {
-        newExpression[index] = '|';
-        log = "changing one AND gate to OR gate, old expression is [ " + expression + " ] new expression is [ " +
-              newExpression + " ]\n";
-    }
-    return {log, newExpression};
-}
-
-void evaluateExpressionEquivalence(TruthTable &table)
-{
-    if (table.hasEquivalentExpressions())
-        cout << "The two logical expressions are " << GREEN << "equivalent.\n" << RESET ;
-    else
-        cout << "The two logical expressions are " << RED << "not equivalent.\n" << RESET;
+void displayWelcomeAndInstructions() {
+    cout << "====================================" << endl;
+    cout << "||        Welcome to the           ||" << endl;
+    cout << "||       Logic Evaluator           ||" << endl;
+    cout << "====================================" << endl;
     cout << endl;
+
+    cout << "This program allows you to evaluate logical expressions using a truth table.\n"
+         << "Please follow the instructions below for proper usage:\n" << endl;
+
+    cout << "1. Use the following operators for logical operations:\n";
+    cout << "   - '&'  : AND operator\n"
+         << "   - '|'  : OR operator\n"
+         << "   - '~'  : NOT operator\n" << endl;
+
+    cout << "2. Use valid **single-character** variable names (e.g., A, B, C, ...).\n";
+    cout << "   Example: A & B | ~C means (A AND B) OR (NOT C).\n" << endl;
+
+    cout << "3. You can use parentheses '(' and ')' to group expressions and control\n"
+         << "   the order of operations.\n";
+    cout << "   Example: (A & B) | (~C & D).\n" << endl;
+
+    cout << "====================================" << endl;
 }
 
-void evaluateExpressionSatisfiability(TruthTable &table, const string &expression, const string &label, bool isOriginal)
-{
-    if (isOriginal ? table.isOrignalExpSatisfiable() : table.isSimplifiedExpSatisfiable())
-    {
-        // Output satisfiable message in green
-        cout << label << " [" << expression << "] is " << GREEN << "satisfiable" << RESET << " with the following inputs: { ";
-        printInputs(isOriginal ? table.getSatisfiableInputsForOrginal() : table.getSatisfiableInputsForSimplified());
-        cout << "}\n";
-    }
-    else
-    {
-        // Output not satisfiable message in red
-        cout << label << " [" << expression << " ] is " << RED << "not satisfiable" << RESET << ".\n";
-    }
-}
 
-void adjustExpressionForSatisfiability(TruthTable &table, map<char, bool> &inputs, string &expression, const string &otherExpression, bool isOriginal)
-{
-    while (isOriginal ? !table.isOrignalExpSatisfiable() : !table.isSimplifiedExpSatisfiable())
-    {
-        auto [log, newExpression] = changeExpression(expression);
-        vector<string> expressions = isOriginal ? vector<string>{newExpression, otherExpression}
-        : vector<string>{otherExpression, newExpression};
-        table.regenrate(inputs, expressions);
-
-        if (isOriginal ? table.isOrignalExpSatisfiable() : table.isSimplifiedExpSatisfiable())
-        {
-            cout << log << (isOriginal ? "Original" : "Simplified") << " expression [" << newExpression << "] is now "<< GREEN << "satisfiable" << RESET << " with inputs: { ";
-            printInputs(isOriginal ? table.getSatisfiableInputsForOrginal() : table.getSatisfiableInputsForSimplified());
-            cout << "}\n";
-        }
-        expression = newExpression; // Update the expression with the modified one
-    }
-    cout << endl;
-}
-
-void printInputs(const map<string, bool> &inputs)
-{
-    for (const auto &[key,value]: inputs)
-        cout << key << ":" << value << "  ";
-}
