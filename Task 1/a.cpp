@@ -289,6 +289,10 @@ string getExpression(const string& s){
 
 
 int main(){
+    cout << "Instructions: \n\tEnter the desired premises and conclusion where any predicate is entered by only one word\n";
+    cout << "\tEx1: if lawyer and not rich then not happy\n";
+    cout << "\tEx2: if lawyer then study\n";
+    cout << "\tEnter an empty line to stop\n\n";
     string s;
     vector <string> expressions;
     while(getline(cin,s)){
