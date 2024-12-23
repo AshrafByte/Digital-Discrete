@@ -45,6 +45,7 @@ private:
 
     pair<string, string> changeExpression(ExpressionType exprType) const;
 
+    // Extract input variables from the original expression and validate that the simplified expression uses the same variables.
     map<char, bool> extractAndValidateVariables();
 
     TruthTable *buildTruthTable();
